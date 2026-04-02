@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sports Center Booking</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: url("background.png") no-repeat center center fixed;
+    background-size: cover;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+}
+
+.section {
+    background: rgba(255,255,255,0.9);
+    padding: 20px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* FACILITIES */
+.facilities {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.facility {
+    position: relative;
+    height: 120px;
+    border-radius: 15px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.facility img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.facility span {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.facility:hover {
+    transform: scale(1.05);
+}
+
+.facility.selected {
+    border: 3px solid black;
+}
+
+/* TIME SLOTS */
+.time-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.slot {
+    background: #eaf2f6;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.slot:hover {
+    background: #d6e9f2;
+}
+
+.slot.selected {
+    background: #a8d4e6;
+}
+
+/* DETAILS */
+.details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* BUTTONS */
+button {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.book {
+    background: #2fb18d;
+    color: white;
+}
+
+.cancel {
+    background: #d6dde2;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- FACILITIES -->
+    <div class="section">
+        <h2>Available Facilities</h2>
+        <div class="facilities">
+
+            <div class="facility" data-id="1">
+                <img src="tennis court.png">
+                <span>Tennis</span>
+            </div>
+
+            <div class="facility" data-id="2">
+                <img src="soccer field.png">
+                <span>Soccer</span>
+            </div>
+
+            <div class="facility" data-id="3">
+                <img src="basketball court.png">
+                <span>Basketball</span>
+            </div>
+
+            <div class="facility" data-id="4">
+                <img src="swimming pool.png">
+                <span>Swimming</span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- TIME SLOTS -->
+    <div class="section">
+        <h2>Time Slots</h2>
+        <div class="time-slots"></div>
+    </div>
+
+    <!-- DETAILS -->
+    <div class="section">
+        <h2>Reservation Details</h2>
+        <div class="details">
+            <div id="detailsText">
+                Select a facility and time slot
+            </div>
+
+            <div>
+                <button class="book" onclick="book()">Book</button>
+                <button class="cancel" onclick="cancelBooking()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let selectedFacilityId = null;
+let selectedScheduleId = null;
+let selectedText = '';
+const USER_ID = 1;
+
+// CLICK FACILITY
+document.querySelectorAll('.facility').forEach(f => {
+    f.addEventListener('click', () => {
+
+        document.querySelectorAll('.facility').forEach(x => x.classList.remove('selected'));
+        f.classList.add('selected');
+
+        selectedFacilityId = f.dataset.id;
+
+        selectedScheduleId = null;
+        selectedText = '';
+        updateDetails();
+
+        loadSchedules(selectedFacilityId);
+    });
+});
+
+// LOAD SCHEDULES
+async function loadSchedules(facilityId) {
+    console.log("Loading schedules for:", facilityId);
+
+    const res = await fetch(`http://localhost:3000/schedules/${facilityId}`);
+    const schedules = await res.json();
+
+    const container = document.querySelector('.time-slots');
+    container.innerHTML = '';
+
+    if (schedules.length === 0) {
+        container.innerHTML = "<p>No available slots</p>";
+        return;
+    }
+
+    schedules.forEach(s => {
+        const div = document.createElement('div');
+        div.classList.add('slot');
+
+        const timeText = `${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)}`;
+        div.innerText = timeText;
+
+        div.addEventListener('click', () => {
+            document.querySelectorAll('.slot').forEach(x => x.classList.remove('selected'));
+            div.classList.add('selected');
+
+            selectedScheduleId = s.schedule_id;
+            selectedText = timeText;
+
+            updateDetails();
+        });
+
+        container.appendChild(div);
+    });
+}
+
+// UPDATE DETAILS
+function updateDetails() {
+    const details = document.getElementById("detailsText");
+
+    if (selectedFacilityId && selectedScheduleId) {
+        details.innerHTML = `Facility ID: ${selectedFacilityId}<br>Time: ${selectedText}`;
+    } else {
+        details.innerHTML = "Select a facility and time slot";
+    }
+}
+
+// BOOK
+async function book() {
+    if (!selectedScheduleId) {
+        alert("Select a time slot");
+        return;
+    }
+
+    const res = await fetch('http://localhost:3000/book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: USER_ID, schedule_id: selectedScheduleId })
+    });
+
+    const data = await res.json();
+    alert(data.message || "Done");
+
+    loadSchedules(selectedFacilityId);
+}
+
+// CANCEL
+async function cancelBooking() {
+    if (!selectedScheduleId) {
+        alert("Select a slot to cancel");
+        return;
+    }
+
+    const res = await fetch('http://localhost:3000/cancel', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: USER_ID, schedule_id: selectedScheduleId })
+    });
+
+    const data = await res.json();
+    alert(data.message || "Cancelled");
+
+    loadSchedules(selectedFacilityId);
+}
+</script>
+
+</body>
+</html>
